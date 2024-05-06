@@ -1,12 +1,20 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
 public class PlayerController : MonoBehaviour
 {
     //Input
+    #region
+    [Header("Input")]
+    [SerializeField] private float _smoothInputSpeed;
+    private Vector2 _currentInputVector;
+    private Vector2 _smoothInputVelocity;
     private PlayerInputActions _inputActions;
+    #endregion
 
     //Movement
+    #region
     [Header("Movement")]
     [SerializeField] private float _currentSpeed;
     [SerializeField] private float _walkSpeed, _walkBackSpeed;
@@ -17,23 +25,39 @@ public class PlayerController : MonoBehaviour
     private bool _isWalking;
     private bool _isSprinting;
     private bool _isCrouching;
+    #endregion
+
+    //Animations
+    #region
+    [Header("Animations")]
+    [SerializeField] private Animator _playerAnimator;
+    #endregion
 
     //Gravity
+    #region
     [Header("Gravity")]
     [SerializeField] private float _gravityMultiplier;
     [SerializeField] private float _velocityY;
     private float _gravity = -9.81f;
+    #endregion
 
     //Jump
+    #region
     [Header("Jump")]
     [SerializeField] private float _jumpForce;
-    
+    [SerializeField] private float _groundDistance;
+    [SerializeField] private LayerMask _groundLayerMask;
+    private bool _isGrounded;
+    #endregion
+
     //Look
+    #region
     [Header("Look")]
     [SerializeField] private Transform _centerSpinePos;
     [Range(0.0f, 100.0f)] [SerializeField] private float _lookSensitivity;
     private float _xRot;
     private float _yRot;
+    #endregion
 
     private void OnEnable()
     {
@@ -48,11 +72,13 @@ public class PlayerController : MonoBehaviour
 
     private void Update()
     {
+        _isGrounded = Physics.CheckSphere(transform.position, _groundDistance, _groundLayerMask);
         HandleInputAndMove();
         HandleLook();
         HandleGravity();
         HandleJump();
         HandleSpeed();
+        HandleAnims();
     }
 
     private void HandleSpeed()
@@ -89,21 +115,24 @@ public class PlayerController : MonoBehaviour
 
     private void HandleGravity()
     {
-        if(_characterController.isGrounded && _velocityY < 0)
-        {
-            _velocityY = -1f;
-        }else
-        {
-            _velocityY += _gravity * Time.deltaTime * _gravityMultiplier;
-        }
+        if(_characterController.isGrounded && _velocityY < 0) _velocityY = -1f;
+        else _velocityY += _gravity * Time.deltaTime * _gravityMultiplier;
     }
 
     private void HandleJump()
     {
-        if (_inputActions.Player.Jump.IsPressed() && _characterController.isGrounded)
+        if (_inputActions.Player.Jump.IsPressed() && _isGrounded)
         {
+            StartCoroutine(JumpRoutine());
             _velocityY = _jumpForce;
         }
+    }
+
+    IEnumerator JumpRoutine()
+    {
+        _playerAnimator.SetBool("isJumping", true);
+        yield return new WaitForSeconds(0.1f);
+        _playerAnimator.SetBool("isJumping", false);
     }
 
     private void HandleLook()
@@ -121,9 +150,28 @@ public class PlayerController : MonoBehaviour
         _centerSpinePos.rotation = Quaternion.Euler(_xRot, _yRot, 0);
     }
 
+    private void HandleAnims()
+    {
+        //movement bools
+        _playerAnimator.SetBool("isSprinting", _isSprinting);
+        _playerAnimator.SetBool("isWalking", _isWalking);
+        _playerAnimator.SetBool("isCrouching", _isCrouching);
+
+        //jumping bool
+        _playerAnimator.SetBool("isGrounded", _isGrounded);
+
+        //movement floats
+        _playerAnimator.SetFloat("VelocityZ", _currentInputVector.x);
+        _playerAnimator.SetFloat("VelocityY", _currentInputVector.y);
+    }
+
     private void HandleInputAndMove()
     {
+        //input
         Vector2 inputVector = _inputActions.Player.Move.ReadValue<Vector2>();
+        _currentInputVector = Vector2.SmoothDamp(_currentInputVector, inputVector, ref _smoothInputVelocity, _smoothInputSpeed);
+
+        //movement
         _moveDirection = inputVector.y * transform.forward + inputVector.x * transform.right;
         _characterController.Move(_moveDirection * _currentSpeed * Time.deltaTime);
         _characterController.Move(transform.up * _velocityY * Time.deltaTime);
