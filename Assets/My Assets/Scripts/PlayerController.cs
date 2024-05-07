@@ -121,7 +121,7 @@ public class PlayerController : MonoBehaviour
 
     private void HandleJump()
     {
-        if (_inputActions.Player.Jump.IsPressed() && _isGrounded)
+        if (_inputActions.Player.Jump.IsPressed() && _characterController.isGrounded)
         {
             StartCoroutine(JumpRoutine());
             _velocityY = _jumpForce;
